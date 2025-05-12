@@ -65,7 +65,19 @@
   const ctx=$('#chart').getContext('2d');
   const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{data:[],borderWidth:2,tension:.3,borderColor:stocks[active].c,pointRadius:0}]},options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{callback:v=>'$'+v.toFixed(2)}}}}});
   function draw(){const s=stocks[active];chart.data.labels=s.h.map((_,i)=>i);chart.data.datasets[0].data=s.h;chart.data.datasets[0].borderColor=s.c;chart.update();}
-  function uiCash(){cashEl.textContent='Cash: $'+fmt(cash);}  function uiBtns(){const p=stocks[active].p;buyBtn.textContent=`Buy 1 – $${fmt(p)}`;const n=bag.filter(h=>h.s===active).length;sellBtn.textContent=`Sell All (${n})`;sellBtn.disabled=!n;sellBtn.classList.toggle('opacity-50',!n);}  function uiTable(){const body=$('#table tbody');body.innerHTML='';if(!bag.length){$('#empty').style.display='block';return;}$('#empty').style.display='none';bag.forEach((h,i)=>{const cur=stocks[h.s].p,pl=cur-h.b;body.insertAdjacentHTML('beforeend',`<tr><td>${i+1}</td><td>${h.s}</td><td>$${fmt(h.b)}</td><td class='${pl>=0?'text-green-400':'text-red-500'}'>${pl>=0?'+':''}$${fmt(pl)}</td><td><button data-id='${h.id}' class='bg-yellow-600 hover:bg-yellow-700 px-1 rounded'>Sell</button></td></tr>`);});}
+  function uiCash(){cashEl.textContent='Cash: $'+fmt(cash);}  function uiBtns(){
+      const p = stocks[active].p;
+      buyBtn.textContent = `Buy 1 – $${fmt(p)}`;
+      const same = bag.filter(h => h.s === active);
+      const n = same.length;
+      let pl = 0;
+      same.forEach(h => pl += p - h.b);
+      const plStr = n ? ` (${pl>=0?'+':'-'}$${fmt(Math.abs(pl))})` : '';
+      sellBtn.textContent = `Sell All (${n})` + plStr;
+      sellBtn.disabled = !n;
+      sellBtn.classList.toggle('opacity-50', !n);
+  }
+  function uiTable(){(){const body=$('#table tbody');body.innerHTML='';if(!bag.length){$('#empty').style.display='block';return;}$('#empty').style.display='none';bag.forEach((h,i)=>{const cur=stocks[h.s].p,pl=cur-h.b;body.insertAdjacentHTML('beforeend',`<tr><td>${i+1}</td><td>${h.s}</td><td>$${fmt(h.b)}</td><td class='${pl>=0?'text-green-400':'text-red-500'}'>${pl>=0?'+':''}$${fmt(pl)}</td><td><button data-id='${h.id}' class='bg-yellow-600 hover:bg-yellow-700 px-1 rounded'>Sell</button></td></tr>`);});}
   const MAX=400;function step(p){let d=Math.round(gauss()*p*.05);if(Math.random()<.05){const s=(.1+Math.random()*.4)*p;d+=Math.round(s)*(Math.random()<.5?-1:1);}return d;}
   function tick(sym){const s=stocks[sym];let np=s.p+step(s.p);np=Math.max(100,Math.max(np,Math.floor(s.p*.3)));s.p=np;s.h.push(np/100);if(s.h.length>MAX)s.h.shift();if(sym===active){draw();uiBtns();}uiTable();}
   function start(sym){clearInterval(stocks[sym].t);stocks[sym].t=setInterval(()=>tick(sym),base*(.7+Math.random()*.6));}
