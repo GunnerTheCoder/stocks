@@ -3,286 +3,123 @@
 <head>
   <meta charset="UTF-8" />
   <title>Parody Stock Trading Game</title>
-  <!-- Tailwind (Play CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
-    html, body { font-size: 15px; }
-    #cashDisplay { font-size: 1.35rem; }
-    button       { font-size: 1rem; }
+    html,body{font-size:15px}
+    #cashDisplay{font-size:1.4rem}
+    button{font-size:1rem}
+    /* Stack layout for narrow screens (≤ 768px) */
+    @media (max-width: 768px){
+      .lg\:grid{display:block;}
+      .mobile-full{width:100%!important}
+      .hide-mobile{display:none!important}
+      .news-col{margin-top:1rem}
+    }
   </style>
 </head>
-
-<body class="bg-gray-900 text-white h-screen p-4">
-  <div class="grid grid-cols-12 grid-rows-6 gap-3 h-full">
-    <!-- Cash -->
-    <div id="cashDisplay"
-         class="col-span-4 row-span-1 flex items-center justify-center
-                bg-gray-800 rounded font-bold">
-      Cash: $100.00
-    </div>
-
-    <!-- Chart -->
-    <div class="col-span-8 row-span-4 bg-gray-800 rounded p-3 flex">
-      <canvas id="stockChart" class="w-full h-full"></canvas>
-    </div>
-
-    <!-- Trade buttons -->
-    <div class="col-span-4 row-start-2 row-span-2 bg-gray-800 rounded
-                flex flex-col items-center gap-3 p-3 text-sm">
-      <div class="flex w-full gap-2">
-        <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded
-                       tickerBtn"
-                data-sym="GGL">GGL</button>
-        <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded
-                       tickerBtn"
-                data-sym="NVD">NVD</button>
-        <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded
-                       tickerBtn"
-                data-sym="MPL">MPL</button>
-      </div>
-      <button id="buyBtn"
-              class="w-full bg-blue-600 hover:bg-blue-700 py-1 rounded
-                     font-semibold">
-        Buy 1 – $10.00
-      </button>
-      <button id="sellAllBtn"
-              class="w-full bg-red-600 hover:bg-red-700 py-1 rounded
-                     font-semibold">
-        Sell All (0)
-      </button>
-    </div>
-
-    <!-- Speed slider -->
-    <div class="col-span-8 col-start-1 row-start-5 row-span-1 bg-gray-800
-                rounded flex flex-col items-center justify-center px-4 py-2
-                text-xs">
-      <label for="speedSlider" class="w-full mb-1">Market Speed</label>
-      <input id="speedSlider" type="range" min="100" max="2000" step="100"
-             value="500" class="w-full">
-      <span id="speedLabel" class="text-gray-400 mt-1">
-        Tick every 0.5 s
-      </span>
-    </div>
-
-    <!-- Portfolio & news -->
-    <div class="col-start-9 col-span-4 row-start-1 row-span-6 bg-gray-800
-                rounded p-3 overflow-y-auto flex flex-col text-xs">
-      <h2 class="text-base font-semibold mb-1">Holdings</h2>
-      <table class="min-w-full text-left" id="portfolioTable">
-        <thead>
-          <tr>
-            <th class="pr-2">#</th>
-            <th class="pr-2">Ticker</th>
-            <th class="pr-2">Bought</th>
-            <th class="pr-2">P/L</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="portfolioBody"></tbody>
-      </table>
-      <p id="emptyPortfolio" class="text-gray-500 mt-1">No holdings</p>
-
-      <hr class="border-gray-600 my-2" />
-      <h2 class="text-base font-semibold mb-1">Market News</h2>
-      <ul id="newsFeed" class="space-y-1"></ul>
-    </div>
+<body class="bg-gray-900 text-white h-screen p-4 overflow-hidden lg:grid lg:grid-cols-12 lg:grid-rows-6 gap-3">
+  <!-- Cash & Speed row -->
+  <div id="cashDisplay" class="mobile-full lg:col-span-4 lg:row-span-1 flex items-center justify-center bg-gray-800 rounded font-bold mb-3 lg:mb-0">
+    Cash: $100.00
+  </div>
+  <div class="mobile-full lg:col-span-4 lg:col-start-5 lg:row-span-1 flex flex-col items-center justify-center bg-gray-800 rounded px-4 py-2 text-xs mb-3 lg:mb-0">
+    <label for="speedSlider" class="w-full mb-1 text-center lg:text-left">Market Speed</label>
+    <input id="speedSlider" type="range" min="100" max="2000" step="100" value="500" class="w-full">
+    <span id="speedLabel" class="text-gray-400 mt-1">Tick every 0.5 s</span>
   </div>
 
-  <script>
-    /********* helpers *********/
-    const $      = sel => document.querySelector(sel);
-    const $$     = sel => [...document.querySelectorAll(sel)];
-    const to$    = c => (c / 100).toFixed(2);
-    const gauss  = () => (Math.random()+Math.random()+Math.random())/3 - 0.5;
+  <!-- Chart -->
+  <div class="mobile-full lg:col-span-8 lg:row-start-2 lg:row-span-4 bg-gray-800 rounded p-3 flex items-center">
+    <canvas id="stockChart" class="w-full h-64 lg:h-full"></canvas>
+  </div>
 
-    /********* stock data *********/
-    const stocks = {
-      GGL: { name:'Gaggle', color:'#f87171', price:1000, history:[], interval:null },
-      NVD: { name:'NaVideo', color:'#a78bfa', price: 800, history:[], interval:null },
-      MPL: { name:'Mapple',  color:'#34d399', price:1200, history:[], interval:null }
-    };
-    const SYMS           = Object.keys(stocks);
-    let   activeSym      = 'GGL';
+  <!-- Trade panel -->
+  <div class="mobile-full lg:col-span-4 lg:row-start-2 lg:row-span-2 bg-gray-800 rounded flex flex-col items-center gap-3 p-3 text-sm">
+    <div class="flex w-full gap-2">
+      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="GGL">GGL</button>
+      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="NVD">NVD</button>
+      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="MPL">MPL</button>
+    </div>
+    <button id="buyBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-1 rounded font-semibold">Buy 1 – $10.00</button>
+    <button id="sellAllBtn" class="w-full bg-red-600 hover:bg-red-700 py-1 rounded font-semibold">Sell All (0)</button>
+  </div>
 
-    /********* game state *********/
-    let cash       = 10000;          // in cents ($100)
-    const holdings = [];             // {id,symbol,boughtAt}
-    let BASE_TICK  = 500;            // ms
+  <!-- Holdings & News -->
+  <div class="mobile-full news-col lg:col-start-9 lg:col-span-4 lg:row-start-2 lg:row-span-4 bg-gray-800 rounded p-3 overflow-y-auto flex flex-col text-xs">
+    <h2 class="text-base font-semibold mb-1">Holdings</h2>
+    <table class="min-w-full text-left" id="portfolioTable">
+      <thead>
+        <tr><th class="pr-2">#</th><th class="pr-2">Ticker</th><th class="pr-2 hide-mobile">Bought</th><th class="pr-2 hide-mobile">P/L</th><th></th></tr>
+      </thead>
+      <tbody id="portfolioBody"></tbody>
+    </table>
+    <p id="emptyPortfolio" class="text-gray-500 mt-1">No holdings</p>
+    <hr class="border-gray-600 my-2" />
+    <h2 class="text-base font-semibold mb-1">Market News</h2>
+    <ul id="newsFeed" class="space-y-1"></ul>
+  </div>
 
-    /********* dom *********/
-    const cashDisp   = $('#cashDisplay');
-    const buyBtn     = $('#buyBtn');
-    const sellAllBtn = $('#sellAllBtn');
-    const speedSl    = $('#speedSlider');
-    const speedLbl   = $('#speedLabel');
-    const newsFeed   = $('#newsFeed');
+<script>
+/* === Helper functions === */
+const $ = s=>document.querySelector(s); const $$= s=>[...document.querySelectorAll(s)];
+const fmt = c=> (c/100).toFixed(2);
+const gauss=()=> (Math.random()+Math.random()+Math.random())/3-0.5;
 
-    /********* chart *********/
-    const ctx = $('#stockChart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type : 'line',
-      data : { labels:[], datasets:[{
-        label:'Price',
-        data:[], tension:0.3, borderWidth:2,
-        borderColor: stocks[activeSym].color, pointRadius:0
-      }]},
-      options: {
-        animation:false,
-        plugins:{ legend:{ display:false }},
-        scales:{ x:{display:false},
-                 y:{ ticks:{ callback:v=>'$'+v.toFixed(2) }} }
-      }
-    });
-    function drawChart() {
-      const s = stocks[activeSym];
-      chart.data.labels = s.history.map((_,i)=>i);
-      chart.data.datasets[0].data = s.history;
-      chart.data.datasets[0].borderColor = s.color;
-      chart.update();
-    }
+/* === Stocks === */
+const stocks={
+  GGL:{name:'Gaggle', color:'#f87171', price:1000, history:[], interval:null},
+  NVD:{name:'NaVideo', color:'#a78bfa', price: 800, history:[], interval:null},
+  MPL:{name:'Mapple',  color:'#34d399', price:1200, history:[], interval:null}
+};
+const SYMS=Object.keys(stocks);
+let active='GGL';
 
-    /********* ui *********/
-    function updateCash() {
-      cashDisp.textContent = 'Cash: $' + to$((cash));
-    }
-    function updateButtons() {
-      const p      = stocks[activeSym].price;
-      buyBtn.textContent      = `Buy 1 – $${to$(p)}`;
-      const owned = holdings.filter(h=>h.symbol===activeSym).length;
-      sellAllBtn.textContent  = `Sell All (${owned})`;
-      sellAllBtn.disabled     = !owned;
-      sellAllBtn.classList.toggle('opacity-50', !owned);
-    }
-    function renderHoldings() {
-      const body = $('#portfolioBody');
-      body.innerHTML = '';
-      if (!holdings.length) { $('#emptyPortfolio').style.display='block'; return; }
-      $('#emptyPortfolio').style.display='none';
-      holdings.forEach((h,i)=>{
-        const cur = stocks[h.symbol].price;
-        const pl  = cur - h.boughtAt;
-        body.insertAdjacentHTML('beforeend', `
-          <tr>
-            <td>${i+1}</td>
-            <td>${h.symbol}</td>
-            <td>$${to$(h.boughtAt)}</td>
-            <td class="${pl>=0?'text-green-400':'text-red-500'}">
-              ${pl>=0?'+':''}$${to$(pl)}
-            </td>
-            <td><button class="bg-yellow-600 hover:bg-yellow-700 px-1 rounded"
-                        data-id="${h.id}">Sell</button></td>
-          </tr>`);
-      });
-    }
+/* === State === */
+let cash=10000; const holds=[]; let BASE=500;
 
-    /********* price engine *********/
-    const MAX_PTS = 400;
-    const delta   = p=>{
-      let d = Math.round(gauss()*p*0.05);
-      if(Math.random()<0.05){
-        const shock = (0.1+Math.random()*0.4)*p;
-        d += Math.round(shock)*(Math.random()<0.5?-1:1);
-      }
-      return d;
-    };
-    function tick(sym){
-      const s = stocks[sym];
-      let np  = s.price + delta(s.price);
-      np      = Math.max(100, Math.max(np, Math.floor(s.price*0.3)));
-      s.price = np;
-      s.history.push(np/100);
-      if (s.history.length > MAX_PTS) s.history.shift();
-      if (sym === activeSym) { drawChart(); updateButtons(); }
-      renderHoldings();
-    }
-    function startTicker(sym){
-      clearInterval(stocks[sym].interval);
-      const j = 0.7 + Math.random()*0.6;
-      stocks[sym].interval = setInterval(()=>tick(sym), BASE_TICK*j);
-    }
-    function restartTickers(){ SYMS.forEach(startTicker); }
+/* === DOM refs === */
+const cashEl=$('#cashDisplay'); const buyBtn=$('#buyBtn'); const sellBtn=$('#sellAllBtn');
 
-    /********* news *********/
-    const NEWS = {
-      GGL:['Gaggle unveils search chip','Gaggle antitrust probe',
-           'Gaggle AI passes test','Gaggle CEO posts meme'],
-      NVD:['NaVideo 1000-core GPU','Crypto crash hurts NaVideo',
-           'NaVideo chips land on Mars','Analysts boost NaVideo target'],
-      MPL:['Mapple unveils iToaster','Mapple supply shortage',
-           'Mapple Vision dominates','Mapple blows past earnings']
-    };
-    function pushNews(text,sym,pct){
-      newsFeed.insertAdjacentHTML('afterbegin',`
-        <li>
-          <b>${sym}</b>: ${text}
-          <span class="${pct>0?'text-green-400':'text-red-500'}">
-            ${pct>0?'▲':'▼'}${Math.abs(pct)}%
-          </span>
-        </li>`);
-      while(newsFeed.children.length>15) newsFeed.lastChild.remove();
-    }
-    function newsEvent(){
-      const sym = SYMS[Math.floor(Math.random()*SYMS.length)];
-      const txt = NEWS[sym][Math.floor(Math.random()*NEWS[sym].length)];
-      const pct = (5+Math.random()*20)*(Math.random()<0.5?-1:1);
-      stocks[sym].price = Math.max(100, Math.round(stocks[sym].price*(1+pct/100)));
-      pushNews(txt,sym,Math.round(pct));
-    }
-    setInterval(newsEvent,30000);
+/* === Chart === */
+const ctx=$('#stockChart').getContext('2d');
+const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{label:'Price',data:[],borderWidth:2,tension:.3,borderColor:stocks[active].color,pointRadius:0}]},options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{callback:v=>'$'+v.toFixed(2)}}}}});
+function draw(){const s=stocks[active];chart.data.labels=s.history.map((_,i)=>i);chart.data.datasets[0].data=s.history;chart.data.datasets[0].borderColor=s.color;chart.update();}
 
-    /********* events *********/
-    $$('.tickerBtn').forEach(btn=>{
-      btn.addEventListener('click',e=>{
-        activeSym = e.target.dataset.sym;
-        $$('.tickerBtn').forEach(b=>b.classList.toggle('bg-gray-600',
-                                   b.dataset.sym===activeSym));
-        drawChart(); updateButtons();
-      });
-    });
+/* === UI refresh === */
+function refreshCash(){cashEl.textContent='Cash: $'+fmt(cash);} 
+function refreshBtns(){const p=stocks[active].price;buyBtn.textContent=`Buy 1 – $${fmt(p)}`;const n=holds.filter(h=>h.symbol===active).length;sellBtn.textContent=`Sell All (${n})`;sellBtn.disabled=!n;sellBtn.classList.toggle('opacity-50',!n);} 
+function renderTable(){const body=$('#portfolioBody');body.innerHTML='';if(!holds.length){$('#emptyPortfolio').style.display='block';return;}$('#emptyPortfolio').style.display='none';holds.forEach((h,i)=>{const cur=stocks[h.symbol].price;const pl=cur-h.boughtAt;body.insertAdjacentHTML('beforeend',`<tr><td>${i+1}</td><td>${h.symbol}</td><td class="hide-mobile">$${fmt(h.boughtAt)}</td><td class="hide-mobile ${pl>=0?'text-green-400':'text-red-500'}">${pl>=0?'+':''}$${fmt(pl)}</td><td><button data-id='${h.id}' class='bg-yellow-600 hover:bg-yellow-700 px-1 rounded'>Sell</button></td></tr>`);});}
 
-    buyBtn.addEventListener('click',()=>{
-      const p = stocks[activeSym].price;
-      if (cash < p) return;
-      cash -= p;
-      holdings.push({ id:Date.now(), symbol:activeSym, boughtAt:p });
-      updateCash(); updateButtons(); renderHoldings();
-    });
+/* === Engine === */
+const MAX=400;
+function delta(p){let d=Math.round(gauss()*p*.05);if(Math.random()<.05){const shock=(.1+Math.random()*.4)*p;d+=Math.round(shock)*(Math.random()<.5?-1:1);}return d;}
+function tick(sym){const s=stocks[sym];let np=s.price+delta(s.price);np=Math.max(100,Math.max(np,Math.floor(s.price*.3)));s.price=np;s.history.push(np/100);if(s.history.length>MAX)s.history.shift();if(sym===active){draw();refreshBtns();}renderTable();}
+function start(sym){clearInterval(stocks[sym].interval);stocks[sym].interval=setInterval(()=>tick(sym),BASE*(.7+Math.random()*.6));}
+function restart(){SYMS.forEach(start);} /* start all */
 
-    sellAllBtn.addEventListener('click',()=>{
-      const p   = stocks[activeSym].price;
-      const own = holdings.filter(h=>h.symbol===activeSym);
-      if (!own.length) return;
-      cash += p * own.length;
-      for(let i=holdings.length-1;i>=0;i--)
-        if(holdings[i].symbol===activeSym) holdings.splice(i,1);
-      updateCash(); updateButtons(); renderHoldings();
-    });
+/* === News === */
+const NEWS={
+  GGL:['Gaggle unveils search chip','Gaggle antitrust probe','Gaggle AI passes test','Gaggle CEO posts meme'],
+  NVD:['NaVideo 1000-core GPU','Crypto crash hurts NaVideo','NaVideo chips land on Mars','Analysts love NaVideo'],
+  MPL:['Mapple reveals iToaster','Mapple supply shortage','Mapple Vision dominates','Mapple smashes earnings']};
+function pushNews(txt,sym,pct){const feed=$('#newsFeed');feed.insertAdjacentHTML('afterbegin',`<li><b>${sym}</b>: ${txt} <span class='${pct>0?'text-green-400':'text-red-500'}'>${pct>0?'▲':'▼'}${Math.abs(pct)}%</span></li>`);while(feed.children.length>15)feed.lastChild.remove();}
+function newsEvt(){const sym=SYMS[Math.floor(Math.random()*SYMS.length)];const txt=NEWS[sym][Math.floor(Math.random()*NEWS[sym].length)];const pct=(5+Math.random()*20)*(Math.random()<.5?-1:1);stocks[sym].price=Math.max(100,Math.round(stocks[sym].price*(1+pct/100)));pushNews(txt,sym,Math.round(pct));}
+setInterval(newsEvt,30000);
 
-    $('#portfolioBody').addEventListener('click',e=>{
-      if(e.target.tagName!=='BUTTON') return;
-      const id  = +e.target.dataset.id;
-      const idx = holdings.findIndex(h=>h.id===id);
-      if(idx>-1){
-        cash += stocks[holdings[idx].symbol].price;
-        holdings.splice(idx,1);
-        updateCash(); updateButtons(); renderHoldings();
-      }
-    });
+/* === Events === */
+$$('.tickerBtn').forEach(b=>b.addEventListener('click',e=>{active=e.target.dataset.sym;$$('.tickerBtn').forEach(x=>x.classList.toggle('bg-gray-600',x.dataset.sym===active));draw();refreshBtns();}));
 
-    speedSl.addEventListener('input',e=>{
-      BASE_TICK          = +e.target.value;
-      speedLbl.textContent = `Tick every ${(BASE_TICK/1000).toFixed(1)} s`;
-      restartTickers();
-    });
+document.getElementById('portfolioBody').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;const id=+e.target.dataset.id;const idx=holds.findIndex(h=>h.id===id);if(idx>-1){cash+=stocks[holds[idx].symbol].price;holds.splice(idx,1);refreshCash();refreshBtns();renderTable();}});
 
-    /********* boot *********/
-    updateCash(); updateButtons(); renderHoldings();
-    $$('.tickerBtn')[0].classList.add('bg-gray-600');
-    SYMS.forEach(sym=>drawChart());     // prime empty histories
-    restartTickers();
-  </script>
+buyBtn.addEventListener('click',()=>{const p=stocks[active].price;if(cash<p)return;cash-=p;holds.push({id:Date.now(),symbol:active,boughtAt:p});refreshCash();refreshBtns();renderTable();});
+
+sellBtn.addEventListener('click',()=>{const list=holds.filter(h=>h.symbol===active);if(!list.length)return;const p=stocks[active].price;cash+=p*list.length;for(let i=holds.length-1;i>=0;i--)if(holds[i].symbol===active)holds.splice(i,1);refreshCash();refreshBtns();renderTable();});
+
+speedSl.addEventListener('input',e=>{BASE=+e.target.value;speedLbl.textContent=`Tick every ${(BASE/1000).toFixed(1)} s`;restart();});
+
+/* === boot === */
+refreshCash();refreshBtns();renderTable();$$('.tickerBtn')[0].classList.add('bg-gray-600');SYMS.forEach(sym=>stocks[sym].history.push(stocks[sym].price/100));draw();restart();
+</script>
 </body>
 </html>
