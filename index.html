@@ -2,124 +2,252 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Parody Stock Trading Game</title>
+  <title>Parody Stock Game</title>
+
+  <!-- Tailwind & Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     html,body{font-size:15px}
     #cashDisplay{font-size:1.4rem}
     button{font-size:1rem}
-    /* Stack layout for narrow screens (≤ 768px) */
-    @media (max-width: 768px){
-      .lg\:grid{display:block;}
-      .mobile-full{width:100%!important}
-      .hide-mobile{display:none!important}
-      .news-col{margin-top:1rem}
+    /* iPad portrait / phones: stack vertically */
+    @media (max-width:768px){
+      .desk-grid{display:block}
+      .full-w   {width:100%!important}
+      .hide-xs  {display:none!important}
+      #chartBox{height:300px}            /* keep chart visible */
     }
   </style>
 </head>
-<body class="bg-gray-900 text-white h-screen p-4 overflow-hidden lg:grid lg:grid-cols-12 lg:grid-rows-6 gap-3">
-  <!-- Cash & Speed row -->
-  <div id="cashDisplay" class="mobile-full lg:col-span-4 lg:row-span-1 flex items-center justify-center bg-gray-800 rounded font-bold mb-3 lg:mb-0">
+
+<body class="bg-gray-900 text-white h-screen p-4 desk-grid grid-cols-12 grid-rows-6 gap-3">
+
+  <!-- cash panel -->
+  <div id="cashDisplay"
+       class="full-w col-span-4 row-span-1 bg-gray-800 rounded flex
+              items-center justify-center font-bold mb-3 lg:mb-0">
     Cash: $100.00
   </div>
-  <div class="mobile-full lg:col-span-4 lg:col-start-5 lg:row-span-1 flex flex-col items-center justify-center bg-gray-800 rounded px-4 py-2 text-xs mb-3 lg:mb-0">
-    <label for="speedSlider" class="w-full mb-1 text-center lg:text-left">Market Speed</label>
-    <input id="speedSlider" type="range" min="100" max="2000" step="100" value="500" class="w-full">
+
+  <!-- market-speed slider (top-centre) -->
+  <div class="full-w col-span-4 col-start-5 row-span-1 bg-gray-800 rounded
+              flex flex-col items-center justify-center px-4 py-2 text-xs
+              mb-3 lg:mb-0">
+    <label class="w-full mb-1 text-center lg:text-left">Market Speed</label>
+    <input id="speed" type="range" min="100" max="2000" step="100" value="500"
+           class="w-full">
     <span id="speedLabel" class="text-gray-400 mt-1">Tick every 0.5 s</span>
   </div>
 
-  <!-- Chart -->
-  <div class="mobile-full lg:col-span-8 lg:row-start-2 lg:row-span-4 bg-gray-800 rounded p-3 flex items-center">
-    <canvas id="stockChart" class="w-full h-64 lg:h-full"></canvas>
+  <!-- chart -->
+  <div id="chartBox"
+       class="full-w col-span-8 row-start-2 row-span-4 bg-gray-800 rounded
+              p-3 flex">
+    <canvas id="chart" class="w-full h-full"></canvas>
   </div>
 
-  <!-- Trade panel -->
-  <div class="mobile-full lg:col-span-4 lg:row-start-2 lg:row-span-2 bg-gray-800 rounded flex flex-col items-center gap-3 p-3 text-sm">
+  <!-- trade controls -->
+  <div class="full-w col-span-4 row-start-2 row-span-2 bg-gray-800 rounded
+              flex flex-col items-center gap-3 p-3 text-sm">
     <div class="flex w-full gap-2">
-      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="GGL">GGL</button>
-      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="NVD">NVD</button>
-      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="MPL">MPL</button>
+      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded symBtn"
+              data-sym="GGL">GGL</button>
+      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded symBtn"
+              data-sym="NVD">NVD</button>
+      <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded symBtn"
+              data-sym="MPL">MPL</button>
     </div>
-    <button id="buyBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-1 rounded font-semibold">Buy 1 – $10.00</button>
-    <button id="sellAllBtn" class="w-full bg-red-600 hover:bg-red-700 py-1 rounded font-semibold">Sell All (0)</button>
+    <button id="buy"
+            class="w-full bg-blue-600 hover:bg-blue-700 py-1 rounded
+                   font-semibold">
+      Buy 1 – $10.00
+    </button>
+    <button id="sell"
+            class="w-full bg-red-600 hover:bg-red-700 py-1 rounded
+                   font-semibold">
+      Sell All (0)
+    </button>
   </div>
 
-  <!-- Holdings & News -->
-  <div class="mobile-full news-col lg:col-start-9 lg:col-span-4 lg:row-start-2 lg:row-span-4 bg-gray-800 rounded p-3 overflow-y-auto flex flex-col text-xs">
+  <!-- holdings + news -->
+  <div class="full-w col-start-9 col-span-4 row-start-2 row-span-4
+              bg-gray-800 rounded p-3 overflow-y-auto flex flex-col text-xs">
     <h2 class="text-base font-semibold mb-1">Holdings</h2>
-    <table class="min-w-full text-left" id="portfolioTable">
+    <table class="min-w-full text-left" id="table">
       <thead>
-        <tr><th class="pr-2">#</th><th class="pr-2">Ticker</th><th class="pr-2 hide-mobile">Bought</th><th class="pr-2 hide-mobile">P/L</th><th></th></tr>
+        <tr><th>#</th><th>Ticker</th><th class="hide-xs">Bought</th>
+            <th class="hide-xs">P/L</th><th></th></tr>
       </thead>
-      <tbody id="portfolioBody"></tbody>
+      <tbody></tbody>
     </table>
-    <p id="emptyPortfolio" class="text-gray-500 mt-1">No holdings</p>
-    <hr class="border-gray-600 my-2" />
+    <p id="empty" class="text-gray-500 mt-1">No holdings</p>
+    <hr class="border-gray-600 my-2">
     <h2 class="text-base font-semibold mb-1">Market News</h2>
-    <ul id="newsFeed" class="space-y-1"></ul>
+    <ul id="news" class="space-y-1"></ul>
   </div>
 
 <script>
-/* === Helper functions === */
-const $ = s=>document.querySelector(s); const $$= s=>[...document.querySelectorAll(s)];
-const fmt = c=> (c/100).toFixed(2);
-const gauss=()=> (Math.random()+Math.random()+Math.random())/3-0.5;
+(function(){
+/* ---------- helpers ---------- */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const $,fmt = (c)=>(c/100).toFixed(2);
 
-/* === Stocks === */
-const stocks={
-  GGL:{name:'Gaggle', color:'#f87171', price:1000, history:[], interval:null},
-  NVD:{name:'NaVideo', color:'#a78bfa', price: 800, history:[], interval:null},
-  MPL:{name:'Mapple',  color:'#34d399', price:1200, history:[], interval:null}
+/* ---------- stock data ---------- */
+const stocks = {
+  GGL:{c:'#f87171', p:1000, h:[], t:null},
+  NVD:{c:'#a78bfa', p: 800, h:[], t:null},
+  MPL:{c:'#34d399', p:1200, h:[], t:null}
 };
-const SYMS=Object.keys(stocks);
-let active='GGL';
+const SYM = Object.keys(stocks);
+let act = 'GGL';
 
-/* === State === */
-let cash=10000; const holds=[]; let BASE=500;
+/* ---------- state ---------- */
+let cash = 10000;  // cents
+const bag = [];    // {id,s,b}
+let speed = 500;
 
-/* === DOM refs === */
-const cashEl=$('#cashDisplay'); const buyBtn=$('#buyBtn'); const sellBtn=$('#sellAllBtn');
+/* ---------- dom ---------- */
+const cashEl  = $('#cashDisplay');
+const buyBtn  = $('#buy');
+const sellBtn = $('#sell');
+const slider  = $('#speed');
+const sLabel  = $('#speedLabel');
 
-/* === Chart === */
-const ctx=$('#stockChart').getContext('2d');
-const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{label:'Price',data:[],borderWidth:2,tension:.3,borderColor:stocks[active].color,pointRadius:0}]},options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{callback:v=>'$'+v.toFixed(2)}}}}});
-function draw(){const s=stocks[active];chart.data.labels=s.history.map((_,i)=>i);chart.data.datasets[0].data=s.history;chart.data.datasets[0].borderColor=s.color;chart.update();}
+/* ---------- chart ---------- */
+const ctx = $('#chart').getContext('2d');
+const chart = new Chart(ctx,{
+  type:'line',
+  data:{labels:[],datasets:[{data:[],borderWidth:2,tension:.3,
+                             borderColor:stocks[act].c,pointRadius:0}]},
+  options:{animation:false,plugins:{legend:{display:false}},
+           scales:{x:{display:false},
+                   y:{ticks:{callback:v=>'$'+v.toFixed(2)}}}}
+});
+function draw(){
+  const s = stocks[act];
+  chart.data.labels = s.h.map((_,i)=>i);
+  chart.data.datasets[0].data = s.h;
+  chart.data.datasets[0].borderColor = s.c;
+  chart.update();
+}
 
-/* === UI refresh === */
-function refreshCash(){cashEl.textContent='Cash: $'+fmt(cash);} 
-function refreshBtns(){const p=stocks[active].price;buyBtn.textContent=`Buy 1 – $${fmt(p)}`;const n=holds.filter(h=>h.symbol===active).length;sellBtn.textContent=`Sell All (${n})`;sellBtn.disabled=!n;sellBtn.classList.toggle('opacity-50',!n);} 
-function renderTable(){const body=$('#portfolioBody');body.innerHTML='';if(!holds.length){$('#emptyPortfolio').style.display='block';return;}$('#emptyPortfolio').style.display='none';holds.forEach((h,i)=>{const cur=stocks[h.symbol].price;const pl=cur-h.boughtAt;body.insertAdjacentHTML('beforeend',`<tr><td>${i+1}</td><td>${h.symbol}</td><td class="hide-mobile">$${fmt(h.boughtAt)}</td><td class="hide-mobile ${pl>=0?'text-green-400':'text-red-500'}">${pl>=0?'+':''}$${fmt(pl)}</td><td><button data-id='${h.id}' class='bg-yellow-600 hover:bg-yellow-700 px-1 rounded'>Sell</button></td></tr>`);});}
+/* ---------- ui ---------- */
+function uiCash(){ cashEl.textContent='Cash: $'+fmt(cash); }
+function uiBtns(){
+  const p=stocks[act].p;
+  buyBtn.textContent = `Buy 1 – $${fmt(p)}`;
+  const n = bag.filter(h=>h.s===act).length;
+  sellBtn.textContent = `Sell All (${n})`;
+  sellBtn.disabled = !n;
+  sellBtn.classList.toggle('opacity-50',!n);
+}
+function uiTable(){
+  const tbody = $('#table tbody');
+  tbody.innerHTML='';
+  if(!bag.length){ $('#empty').style.display='block'; return;}
+  $('#empty').style.display='none';
+  bag.forEach((h,i)=>{
+    const cur=stocks[h.s].p, pl=cur-h.b;
+    tbody.insertAdjacentHTML('beforeend',`
+      <tr>
+        <td>${i+1}</td><td>${h.s}</td>
+        <td class="hide-xs">$${fmt(h.b)}</td>
+        <td class="hide-xs ${pl>=0?'text-green-400':'text-red-500'}">
+          ${pl>=0?'+':''}$${fmt(pl)}</td>
+        <td><button data-id="${h.id}"
+                    class="bg-yellow-600 hover:bg-yellow-700 px-1 rounded">
+            Sell</button></td>
+      </tr>`);
+  });
+}
 
-/* === Engine === */
+/* ---------- engine ---------- */
 const MAX=400;
-function delta(p){let d=Math.round(gauss()*p*.05);if(Math.random()<.05){const shock=(.1+Math.random()*.4)*p;d+=Math.round(shock)*(Math.random()<.5?-1:1);}return d;}
-function tick(sym){const s=stocks[sym];let np=s.price+delta(s.price);np=Math.max(100,Math.max(np,Math.floor(s.price*.3)));s.price=np;s.history.push(np/100);if(s.history.length>MAX)s.history.shift();if(sym===active){draw();refreshBtns();}renderTable();}
-function start(sym){clearInterval(stocks[sym].interval);stocks[sym].interval=setInterval(()=>tick(sym),BASE*(.7+Math.random()*.6));}
-function restart(){SYMS.forEach(start);} /* start all */
+function swing(p){
+  let d = Math.round(((Math.random()+Math.random()+Math.random())/3-.5)*p*.05);
+  if(Math.random()<.05){
+    const s=(.1+Math.random()*.4)*p;
+    d+=Math.round(s)*(Math.random()<.5?-1:1);
+  }
+  return d;
+}
+function tick(sym){
+  const s=stocks[sym];
+  let np=s.p+swing(s.p);
+  np=Math.max(100,Math.max(np,Math.floor(s.p*.3)));
+  s.p=np;
+  s.h.push(np/100);
+  if(s.h.length>MAX)s.h.shift();
+  if(sym===act){ draw(); uiBtns(); }
+  uiTable();
+}
+function run(sym){
+  clearInterval(stocks[sym].t);
+  const j=.7+Math.random()*.6;
+  stocks[sym].t=setInterval(()=>tick(sym),speed*j);
+}
+function restart(){ SYM.forEach(run); }
 
-/* === News === */
+/* ---------- news ---------- */
 const NEWS={
-  GGL:['Gaggle unveils search chip','Gaggle antitrust probe','Gaggle AI passes test','Gaggle CEO posts meme'],
-  NVD:['NaVideo 1000-core GPU','Crypto crash hurts NaVideo','NaVideo chips land on Mars','Analysts love NaVideo'],
-  MPL:['Mapple reveals iToaster','Mapple supply shortage','Mapple Vision dominates','Mapple smashes earnings']};
-function pushNews(txt,sym,pct){const feed=$('#newsFeed');feed.insertAdjacentHTML('afterbegin',`<li><b>${sym}</b>: ${txt} <span class='${pct>0?'text-green-400':'text-red-500'}'>${pct>0?'▲':'▼'}${Math.abs(pct)}%</span></li>`);while(feed.children.length>15)feed.lastChild.remove();}
-function newsEvt(){const sym=SYMS[Math.floor(Math.random()*SYMS.length)];const txt=NEWS[sym][Math.floor(Math.random()*NEWS[sym].length)];const pct=(5+Math.random()*20)*(Math.random()<.5?-1:1);stocks[sym].price=Math.max(100,Math.round(stocks[sym].price*(1+pct/100)));pushNews(txt,sym,Math.round(pct));}
-setInterval(newsEvt,30000);
+  GGL:['Gaggle antitrust probe','Gaggle AI passes test','Gaggle CEO posts meme'],
+  NVD:['NaVideo 1000-core GPU','Crypto crash hits NaVideo','Analysts love NaVideo'],
+  MPL:['Mapple unveils iToaster','Mapple Vision dominates','Mapple smashes EPS']
+};
+function news(){
+  const sym=SYM[Math.floor(Math.random()*SYM.length)];
+  const txt=NEWS[sym][Math.floor(Math.random()*NEWS[sym].length)];
+  const pct=(5+Math.random()*20)*(Math.random()<.5?-1:1);
+  stocks[sym].p=Math.max(100,Math.round(stocks[sym].p*(1+pct/100)));
+  $('#news').insertAdjacentHTML('afterbegin',`
+     <li><b>${sym}</b>: ${txt}
+         <span class="${pct>0?'text-green-400':'text-red-500'}">
+           ${pct>0?'▲':'▼'}${Math.abs(pct)}%</span></li>`);
+}
+setInterval(news,30000);
 
-/* === Events === */
-$$('.tickerBtn').forEach(b=>b.addEventListener('click',e=>{active=e.target.dataset.sym;$$('.tickerBtn').forEach(x=>x.classList.toggle('bg-gray-600',x.dataset.sym===active));draw();refreshBtns();}));
+/* ---------- events ---------- */
+$$('.symBtn').forEach(b=>b.addEventListener('click',e=>{
+  act=e.target.dataset.sym;
+  $$('.symBtn').forEach(x=>x.classList.toggle('bg-gray-600',x.dataset.sym===act));
+  uiBtns(); draw();
+}));
+buyBtn.addEventListener('click',()=>{
+  const p=stocks[act].p; if(cash<p)return;
+  cash-=p; bag.push({id:Date.now(),s:act,b:p});
+  uiCash(); uiBtns(); uiTable();
+});
+sellBtn.addEventListener('click',()=>{
+  const p=stocks[act].p;
+  bag.filter(h=>h.s===act).forEach(()=>cash+=p);
+  for(let i=bag.length-1;i>=0;i--)if(bag[i].s===act)bag.splice(i,1);
+  uiCash(); uiBtns(); uiTable();
+});
+$('#table tbody').addEventListener('click',e=>{
+  if(e.target.tagName!=='BUTTON')return;
+  const id=+e.target.dataset.id;
+  const idx=bag.findIndex(h=>h.id===id);
+  if(idx>-1){ cash+=stocks[bag[idx].s].p; bag.splice(idx,1);
+              uiCash(); uiBtns(); uiTable(); }
+});
+slider.addEventListener('input',e=>{
+  speed=+e.target.value;
+  sLabel.textContent=`Tick every ${(speed/1000).toFixed(1)} s`;
+  restart();
+});
 
-document.getElementById('portfolioBody').addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;const id=+e.target.dataset.id;const idx=holds.findIndex(h=>h.id===id);if(idx>-1){cash+=stocks[holds[idx].symbol].price;holds.splice(idx,1);refreshCash();refreshBtns();renderTable();}});
-
-buyBtn.addEventListener('click',()=>{const p=stocks[active].price;if(cash<p)return;cash-=p;holds.push({id:Date.now(),symbol:active,boughtAt:p});refreshCash();refreshBtns();renderTable();});
-
-sellBtn.addEventListener('click',()=>{const list=holds.filter(h=>h.symbol===active);if(!list.length)return;const p=stocks[active].price;cash+=p*list.length;for(let i=holds.length-1;i>=0;i--)if(holds[i].symbol===active)holds.splice(i,1);refreshCash();refreshBtns();renderTable();});
-
-speedSl.addEventListener('input',e=>{BASE=+e.target.value;speedLbl.textContent=`Tick every ${(BASE/1000).toFixed(1)} s`;restart();});
-
-/* === boot === */
-refreshCash();refreshBtns();renderTable();$$('.tickerBtn')[0].classList.add('bg-gray-600');SYMS.forEach(sym=>stocks[sym].history.push(stocks[sym].price/100));draw();restart();
+/* ---------- boot ---------- */
+function init(){
+  uiCash(); uiBtns(); uiTable();
+  $$('.symBtn')[0].classList.add('bg-gray-600');
+  SYM.forEach(s=>stocks[s].h=[stocks[s].p/100]); // seed history
+  draw(); restart();
+}
+document.addEventListener('DOMContentLoaded',init);
+})();
 </script>
 </body>
 </html>
