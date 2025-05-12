@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Parody Stock Trading Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* smaller overall footprint */
+    html,body{font-size:14px}
+    #cashDisplay{font-size:1.25rem}
+    button{font-size:0.9rem}
+  </style>
+</head>
+<body class="bg-gray-900 text-white h-screen p-3">
+  <div class="grid grid-cols-12 grid-rows-6 gap-3 h-full">
+    <!-- Cash Display -->
+    <div id="cashDisplay" class="col-span-4 row-span-1 flex items-center justify-center bg-gray-800 rounded text-lg font-bold">
+      Cash: $100.00
+    </div>
+
+    <!-- Price Chart -->
+    <div class="col-span-8 row-span-4 bg-gray-800 rounded p-3">
+      <canvas id="stockChart"></canvas>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="col-span-4 row-start-2 row-span-3 bg-gray-800 rounded flex flex-col items-center gap-3 p-3 text-sm">
+      <div class="flex w-full gap-2">
+        <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="GGL">GGL</button>
+        <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="NVD">NVD</button>
+        <button class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded tickerBtn" data-sym="MPL">MPL</button>
+      </div>
+      <button id="buyBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-1 rounded font-semibold">Buy 1 – $10.00</button>
+      <button id="sellAllBtn" class="w-full bg-red-600 hover:bg-red-700 py-1 rounded font-semibold">Sell All (0)</button>
+      <hr class="w-full border-gray-600 my-1" />
+      <label for="speedSlider" class="w-full">Market Speed</label>
+      <input id="speedSlider" type="range" min="100" max="2000" step="100" value="500" class="w-full">
+      <span id="speedLabel" class="text-gray-400">Tick every 0.5 s</span>
+    </div>
+
+    <!-- Portfolio & News -->
+    <div class="col-start-9 col-span-4 row-start-1 row-span-6 bg-gray-800 rounded p-3 overflow-y-auto flex flex-col text-xs">
+      <h2 class="text-base font-semibold mb-1">Holdings</h2>
+      <table class="min-w-full text-left" id="portfolioTable">
+        <thead>
+          <tr>
+            <th class="pr-2">#</th>
+            <th class="pr-2">Ticker</th>
+            <th class="pr-2">Bought</th>
+            <th class="pr-2">P/L</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="portfolioBody"></tbody>
+      </table>
+      <p id="emptyPortfolio" class="text-gray-500 mt-1">No holdings</p>
+      <hr class="border-gray-600 my-2" />
+      <h2 class="text-base font-semibold mb-1">Market News</h2>
+      <ul id="newsFeed" class="space-y-1"></ul>
+    </div>
+  </div>
+<script>
+/********* Utility *********/
+const centsToDollars = c=> (c/100).toFixed(2);
+const pseudoGaussian=()=> (Math.random()+Math.random()+Math.random())/3-0.5;
+/********* Stocks *********/
+const stocks={
+  GGL:{name:'Gaggle',color:'#f87171',price:1000,history:[],interval:null},
+  NVD:{name:'NaVideo',color:'#a78bfa',price:800 ,history:[],interval:null},
+  MPL:{name:'Mapple',color:'#34d399',price:1200,history:[],interval:null}
+};
+const SYMBOLS=Object.keys(stocks);
+let activeSymbol='GGL';
+/********* Game State *********/
+let cash=10000;
+const portfolio=[];
+let BASE_TICK=500;
+/********* Elements *********/
+const cashDisplay=document.getElementById('cashDisplay');
+const buyBtn=document.getElementById('buyBtn');
+const sellAllBtn=document.getElementById('sellAllBtn');
+const portfolioBody=document.getElementById('portfolioBody');
+const emptyPortfolio=document.getElementById('emptyPortfolio');
+const tickerBtns=[...document.querySelectorAll('.tickerBtn')];
+const speedSlider=document.getElementById('speedSlider');
+const speedLabel=document.getElementById('speedLabel');
+const newsFeed=document.getElementById('newsFeed');
+/********* Chart *********/
+const ctx=document.getElementById('stockChart').getContext('2d');
+const chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{label:'$ Price',data:[],tension:.3,borderWidth:2,borderColor:stocks[activeSymbol].color,pointRadius:0}]},options:{animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{callback:v=>'$'+v.toFixed(2)}}}}});
+function refreshChart(){const s=stocks[activeSymbol];chart.data.labels=s.history.map((_,i)=>i);chart.data.datasets[0].data=s.history;chart.data.datasets[0].borderColor=s.color;chart.update();}
+/********* UI *********/
+function updateCash(){cashDisplay.textContent='Cash: $'+centsToDollars(cash);} 
+function updateButtons(){const p=stocks[activeSymbol].price;buyBtn.textContent=`Buy 1 – $${centsToDollars(p)}`;const cnt=portfolio.filter(h=>h.symbol===activeSymbol).length;sellAllBtn.textContent=`Sell All (${cnt})`;sellAllBtn.disabled=cnt===0;sellAllBtn.classList[cnt===0?'add':'remove']('opacity-50');}
+function renderPortfolio(){portfolioBody.innerHTML='';if(!portfolio.length){emptyPortfolio.style.display='block';return;}emptyPortfolio.style.display='none';portfolio.forEach((h,idx)=>{const pr=stocks[h.symbol].price;const pl=pr-h.boughtAt;const tr=document.createElement('tr');tr.innerHTML=`<td>${idx+1}</td><td>${h.symbol}</td><td>$${centsToDollars(h.boughtAt)}</td><td class="${pl>=0?'text-green-400':'text-red-500'}">${pl>=0?'+':''}$${centsToDollars(pl)}</td><td><button class='bg-yellow-600 hover:bg-yellow-700 px-1 rounded' data-id='${h.id}'>Sell</button></td>`;portfolioBody.appendChild(tr);});}
+/********* Price Engine *********/
+const MAX_POINTS=400;
+function nextDelta(cur){const base=cur*.05;let d=Math.round(pseudoGaussian()*base);if(Math.random()<.05){const shock=(.1+Math.random()*.4)*cur;d+=Math.round(shock)*(Math.random()<.5?-1:1);}return d;}
+function tickSymbol(sym){const s=stocks[sym];let newP=s.price+nextDelta(s.price);newP=Math.max(100,Math.max(newP,Math.floor(s.price*.3)));s.price=newP;s.history.push(newP/100);if(s.history.length>MAX_POINTS)s.history.shift();if(sym===activeSymbol){refreshChart();updateButtons();}renderPortfolio();}
+function startTicker(sym){if(stocks[sym].interval)clearInterval(stocks[sym].interval);const jitter=.7+Math.random()*.6;stocks[sym].interval=setInterval(()=>tickSymbol(sym),BASE_TICK*jitter);} 
+function restartAllTickers(){SYMBOLS.forEach(sym=>startTicker(sym));}
+/********* News *********/
+const newsMessages={GGL:['Gaggle unveils search chip','Gaggle antitrust probe','Gaggle AI passes test','Gaggle CEO posts meme'],NVD:['NaVideo 1000‑core GPU','Crypto crash hurts NaVideo','NaVideo chips to Mars','Analysts love NaVideo'],MPL:['Mapple reveals iToaster','Mapple supply shortage','Mapple Vision dominates','Mapple smashes earnings']};
+function pushNews(txt,sym,effect){const li=document.createElement('li');li.innerHTML=`<b>${sym}</b>: ${txt} <span class='${effect>0?'text-green-400':'text-red-500'}'>${effect>0?'▲':'▼'}${Math.abs(effect)}%</span>`;newsFeed.prepend(li);while(newsFeed.children.length>15)newsFeed.removeChild(newsFeed.lastChild);} 
+function runNews(){const sym=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];const msg=newsMessages[sym][Math.floor(Math.random()*newsMessages[sym].length)];const pct=(5+Math.random()*20)*(Math.random()<.5?-1:1);const s=stocks[sym];s.price=Math.max(100,Math.round(s.price*(1+pct/100)));pushNews(msg,sym,pct.toFixed(0));}
+setInterval(runNews,30000);
+/********* Event Listeners *********/
+tickerBtns.forEach(btn=>btn.addEventListener('click',e=>{activeSymbol=e.target.dataset.sym;refreshChart();updateButtons();tickerBtns.forEach(b=>b.classList.toggle('bg-gray-600',b.dataset.sym===activeSymbol));}));
+buyBtn.addEventListener('click',()=>{const p=stocks[activeSymbol].price;if(cash<p)return;cash-=p;portfolio.push({id:Date.now(),symbol:activeSymbol,boughtAt:p});updateCash();updateButtons();renderPortfolio();});
+sellAllBtn.addEventListener('click',()=>{const holdings=portfolio.filter(h=>h.symbol===activeSymbol);if(!holdings.length)return;const p=stocks[activeSymbol].price;cash+=p*holdings.length;for(let i=portfolio.length-1;i>=0;i--)if(portfolio[i].symbol===activeSymbol)portfolio.splice(i,1);updateCash();updateButtons();renderPortfolio();});
+portfolioBody.addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;const id=+e.target.dataset.id;const idx=portfolio.findIndex(h=>h.id===id);if(idx!==-1){const p=stocks[portfolio[idx].symbol].price;cash+=p;portfolio.splice(idx,1);updateCash();updateButtons();renderPortfolio();}});
+speedSlider.addEventListener('input',e=>{BASE_TICK=+e.target.value;speedLabel.textContent=`Tick every ${(BASE_TICK/1000).toFixed(1)} s`;restartAllTickers();});
+/********* Init *********/
+updateCash();updateButtons();refreshChart();tickerBtns[0].classList.add('bg-gray-600');restartAllTickers();
+</script>
+</body>
+</html>
